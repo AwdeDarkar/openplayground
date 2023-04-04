@@ -402,6 +402,7 @@ const PlaygroundContextWrapper = ({page, children}) => {
         PAGE_MODELS_STATE.push({
           name: model_key,
           tag: model_key,
+          capabilities: modelDetails.capabilities,
           provider: modelDetails.provider,
           parameters: Object.entries(modelDetails.parameters).reduce((acc, [key, fields]) => {
             acc[key] = fields.value;
@@ -412,6 +413,7 @@ const PlaygroundContextWrapper = ({page, children}) => {
           })
       } else {
         if (!existingModelEntry.parameters) {
+          existingModelEntry.capabilites = modelDetails.capabilities,
           existingModelEntry.provider = modelDetails.provider,
           existingModelEntry.tag = model_key;
           existingModelEntry.parameters = Object.entries(modelDetails.parameters).reduce((acc, [key, fields]) => {
@@ -423,6 +425,7 @@ const PlaygroundContextWrapper = ({page, children}) => {
 
       models[model_key] = {
         name: model_key,
+        capabilities: modelDetails.capabilities,
         defaultParameters: modelDetails.parameters,
         provider: modelDetails.provider,
       }
@@ -441,21 +444,23 @@ const PlaygroundContextWrapper = ({page, children}) => {
 
   const debouncedSettingsSave = useDebounce(saveSettings, 3000);
 
-  const setEditorContext = (newEditorContext) => {
-    //console.warn("Setting the editor....", newEditorContext)
+  const setEditorContext = (newEditorContext, immediate=false) => {
     SETTINGS.pages[page].editor = {...SETTINGS.pages[page].editor, ...newEditorContext};
 
     const _editor = {...SETTINGS.pages[page].editor, internalState: null };
 
     _setEditorContext(_editor);
-    debouncedSettingsSave()
+    if (immediate) {
+      saveSettings()
+    } else {
+      debouncedSettingsSave()
+    }
   }
 
   const setParametersContext = (newParameters) => {
     const parameters = { ...DEFAULT_PARAMETERS_STATE, ...newParameters}
     SETTINGS.pages[page].parameters = parameters;
-    console.warn("Setting the parameters....", parameters, "input", newParameters)
-    
+
     debouncedSettingsSave()
     _setParametersContext(parameters);
   }

@@ -5,11 +5,13 @@ import warnings
 import io
 import queue
 import sys
+from pathlib import Path
 import json
 import threading
 import time
 import re
 
+from server.lib.entities import Model, Provider
 from server.lib.inference import ProviderDetails, InferenceManager, InferenceRequest
 from server.lib.event_emitter import EventEmitter, EVENTS
 from server.lib.storage import Storage
@@ -31,15 +33,19 @@ warnings.formatwarning = warning_on_one_line
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-
 app = Flask(__name__)
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve(path):
-    if path == "" or not os.path.exists(app.static_folder + '/' + path):
+    if path == "" or not os.path.exists(f'{app.static_folder}/{path}'):
         path = 'index.html'
 
+    return send_from_directory(app.static_folder, path)
+
+@app.errorhandler(404)
+def page_not_found(i):
+    path = 'index.html'
     return send_from_directory(app.static_folder, path)
 
 @app.before_request
@@ -72,23 +78,21 @@ class MonitorThread(threading.Thread):
                 for line in lines:
                     if line == "":
                         continue
-                    
+
                     if line.startswith("Downloading shards:"):
-                        progress = re.search(r"\| (\d+)/(\d+) \[", line)
-                        if progress:
-                            current_shard, total_shards = int(progress.group(1)), int(progress.group(2))
+                        if progress := re.search(r"\| (\d+)/(\d+) \[", line):
+                            current_shard, total_shards = int(progress[1]), int(progress[2])
                     elif line.startswith("Downloading"):
                         percentage = re.search(r":\s+(\d+)%", line)
-                        percentage = percentage.group(0)[2:] if percentage else ""
+                        percentage = percentage[0][2:] if percentage else ""
 
                         progress = re.search(r"\[(.*?)\]", line)
-                        if progress and "?" not in progress.group(0):
-                            current_duration, rest = progress.group(0)[1:-1].split("<")
+                        if progress and "?" not in progress[0]:
+                            current_duration, rest = progress[0][1:-1].split("<")
                             total_duration, speed = rest.split(",")
 
-                            download_size = re.search(r"\| (.*?)\[", line)
-                            if download_size:
-                                current_size, total_size = download_size.group(0)[2:-1].strip().split("/")
+                            if download_size := re.search(r"\| (.*?)\[", line):
+                                current_size, total_size = download_size[0][2:-1].strip().split("/")
 
                             self.event_emitter.emit(EVENTS.MODEL_DOWNLOAD_UPDATE, self.model, {
                                 'current_shard': current_shard,
@@ -117,13 +121,28 @@ class NotificationManager:
     def __init__(self, sse_queue: SSEQueueWithTopic):
         self.event_emitter = EventEmitter()
         self.event_emitter.on(EVENTS.MODEL_UPDATED, self.__model_updated_callback__)
+        self.event_emitter.on(EVENTS.MODEL_ADDED, self.__model_added_callback__)
         #TODO Fix the bug where SSE gets blocked
         #self.event_emitter.on(EVENTS.MODEL_DOWNLOAD_UPDATE, self.__model_download_update_callback__)
         self.sse_queue = sse_queue
 
+    def __model_added_callback__(self, model_name, model):
+        if model.status == 'ready':
+            self.sse_queue.publish(json.dumps({
+                'type': 'notification',
+                'data': {
+                    'message': {
+                        'event': 'modelAdded',
+                        'data': {
+                            'model': model.name,
+                            'provider': model.provider
+                        }
+                    }
+                }
+            }))
+
     def __model_updated_callback__(self, model_name, model):
         if model.status == 'ready':
-            print("Publishing model added event...")
             self.sse_queue.publish(json.dumps({
                 'type': 'notification',
                 'data': {
@@ -138,8 +157,6 @@ class NotificationManager:
             }))
 
     def __model_download_update_callback__(self, _, model, progress):
-        print(f"Model download progress: {model} {progress}")
-
         self.sse_queue.publish(json.dumps({
             'type': 'notification',
             'data': {
@@ -171,7 +188,29 @@ class DownloadManager:
 
         for model in models:
             if model.status == 'pending':
+                print(model)
                 self.model_queue.put(model)
+
+        # TODO: In the future it might make sense to have local provider specific instances
+        cache_info = scan_cache_dir()
+        hugging_face_local = self.storage.get_provider("huggingface-local")
+ 
+        for repo_info in cache_info.repos:
+            repo_id = repo_info.repo_id
+            repo_type = repo_info.repo_type
+            if repo_type == "model":
+                if hugging_face_local.has_model(repo_id):
+                    continue
+                else:
+                    model = Model(
+                        name=repo_id,
+                        capabilities=hugging_face_local.default_capabilities,
+                        provider="huggingface-local",
+                        status="ready",
+                        enabled=True,
+                        parameters=hugging_face_local.default_parameters
+                    )
+                    hugging_face_local.add_model(model)
 
         t = threading.Thread(target=self.__download_loop__)
         t.start()

@@ -83,13 +83,13 @@ const ProviderSearchModels = ({
         Model Search
       </h3>
       <p>
-        Search for a model or part of a model to get matches from
-        {provider} Hub
+        Search for a model or part of a model to get matches from {provider} Hub
       </p>
 
       <form onSubmit={searchModel}>
         <div className="flex w-full max-w-sm items-center space-x-2 mt-2">
           <Input
+            disabled = {providerRequiresAPIKey && (apiKey === "" || apiKey === null)}
             type="text"
             id="model-query"
              placeholder="Search Query"
@@ -97,7 +97,7 @@ const ProviderSearchModels = ({
           />
           <Button
             type="submit"
-            disabled = {providerRequiresAPIKey && apiKey === ""}
+            disabled = {providerRequiresAPIKey && (apiKey === "" || apiKey === null)}
           >
             Search
           </Button>
@@ -181,6 +181,7 @@ const ProviderCredentials = ({provider, providerRequiresAPIKey, apiKey, setAPIKe
 const ProviderModelSelection = ({
   provider,
   apiKey,
+  providerRequiresAPIKey,
   providerModels, toggleModel
 }: ProviderProps) => {
   const handleModelSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -212,7 +213,7 @@ const ProviderModelSelection = ({
               <Checkbox
                 key={model}
                 className="float-right"
-                disabled={apiKey === "" || apiKey === null}
+                disabled={providerRequiresAPIKey && (apiKey === "" || apiKey === null)}
                 onCheckedChange={(event) =>
                   handleModelSelect(model.name, event)
                 }
@@ -455,14 +456,14 @@ export default function Settings() {
   const providersButtons = () => 
     Object.entries(providers).map(([name, _]) => 
       <React.Fragment key={name}>
-        <Button
-          variant={providerName == name ? "subtle" : "ghost"}
-          size={isLg ? "default" : "sm"}
-          className="text-center lg:text-base lg:text-left lg:w-full lg:text-left"
+        <button
+          className={`block w-full text-left px-2 py-1 border-l-2 ${
+            providerName === name ? "border-blue-500" : "border-transparent"
+          }`}
           onClick={(e) => setProviderName(name)}
         >
-          {name }
-        </Button>
+          <span className={providerName === name ? "font-bold": "font-normal"}>{name}</span>
+        </button>
       </React.Fragment>
     )
 

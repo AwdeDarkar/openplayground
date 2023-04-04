@@ -71,8 +71,9 @@ def provider_toggle_model(provider_name, model_name):
     if model is None:
         model = Model(
             name=model_name,
+            capabilities=provider.default_capabilities,
             provider=provider_name,
-            status='pending',
+            status="ready" if provider.remote_inference else "pending",
             enabled=True,
             parameters=provider.default_parameters
         )
@@ -131,10 +132,10 @@ def provider_update_api_key(provider_name):
 
     api_key = data['apiKey']
     if api_key is None:
-        return create_response_message(f"Invalid API key", 400)
-    
+        return create_response_message("Invalid API key", 400)
+
     storage.update_provider_api_key(provider_name, api_key)
- 
+
     response = jsonify({'status': 'success'})
     response.headers.add('Access-Control-Allow-Origin', '*')
     return response
