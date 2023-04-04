@@ -39,6 +39,9 @@ const DEFAULT_HISTORY_STATE = {
 }
 
 const DEFAULT_CONTEXTS = {
+  GLOBAL: {
+    darkMode: false,
+  },
   PAGES: {
     playground:{
       history: DEFAULT_HISTORY_STATE,
@@ -60,10 +63,10 @@ const DEFAULT_CONTEXTS = {
   MODELS: [],
 }
 
-let SETTINGS = null;
+let SETTINGS: any = null;
 
 try {
-  SETTINGS = JSON.parse(localStorage.getItem("openplayground_settings"));
+  SETTINGS = JSON.parse(localStorage.getItem("openplayground_settings") || "");
   if (!SETTINGS) throw new Error("no settings")
 } catch (e) {
   localStorage.clear();
@@ -85,6 +88,10 @@ export const ModelContext = React.createContext({});
 
 export const APIContext = React.createContext({});
 
+export const GlobalContext = React.createContext({
+  globalContext: DEFAULT_CONTEXTS.GLOBAL,
+  setGlobalContext: (newContext: any) => { console.log("newContext", newContext) }
+});
 export const EditorContext = React.createContext({});
 export const ModelsStateContext = React.createContext([]);
 export const ParametersContext = React.createContext({});
@@ -322,6 +329,7 @@ const APIContextWrapper = ({children}) => {
 const PlaygroundContextWrapper = ({page, children}) => {
   const apiContext = React.useContext(APIContext)
 
+  const [globalContext, _setGlobalContext] = React.useState(DEFAULT_CONTEXTS.GLOBAL);
   const [editorContext, _setEditorContext] = React.useState(DEFAULT_CONTEXTS.PAGES[page].editor);
   const [parametersContext, _setParametersContext] = React.useState(DEFAULT_CONTEXTS.PAGES[page].parameters);
   let [modelsStateContext, _setModelsStateContext] = React.useState(DEFAULT_CONTEXTS.PAGES[page].modelsState);
@@ -550,21 +558,33 @@ const PlaygroundContextWrapper = ({page, children}) => {
     updateModelsData().catch(console.error)
   }, [])
 
+  const setGlobalContext = (newGlobalContext: any) => {
+    console.log("Setting global context", newGlobalContext);
+    if (newGlobalContext.darkMode !== globalContext.darkMode) {
+      console.log(`Setting dark mode to ${newGlobalContext.darkMode}`);
+      document.documentElement.classList.toggle("dark", newGlobalContext.darkMode);
+    }
+    _setGlobalContext(newGlobalContext);
+    debouncedSettingsSave();
+  }
+
   return (
-    <HistoryContext.Provider value = {{
-      historyContext, selectHistoryItem,
-      addHistoryEntry, removeHistoryEntry, clearHistory, toggleShowHistory
-    }}>
-      <EditorContext.Provider value = {{editorContext, setEditorContext}}>
-        <ParametersContext.Provider value = {{parametersContext, setParametersContext}}>
-          <ModelsContext.Provider value = {{modelsContext, setModelsContext}}>
-            <ModelsStateContext.Provider value = {{modelsStateContext, setModelsStateContext}}>
-              {children}
-            </ModelsStateContext.Provider>
-          </ModelsContext.Provider>
-        </ParametersContext.Provider>
-      </EditorContext.Provider>
-    </HistoryContext.Provider>
+    <GlobalContext.Provider value = {{globalContext, setGlobalContext}}>
+      <HistoryContext.Provider value = {{
+        historyContext, selectHistoryItem,
+        addHistoryEntry, removeHistoryEntry, clearHistory, toggleShowHistory
+      }}>
+        <EditorContext.Provider value = {{editorContext, setEditorContext}}>
+          <ParametersContext.Provider value = {{parametersContext, setParametersContext}}>
+            <ModelsContext.Provider value = {{modelsContext, setModelsContext}}>
+              <ModelsStateContext.Provider value = {{modelsStateContext, setModelsStateContext}}>
+                {children}
+              </ModelsStateContext.Provider>
+            </ModelsContext.Provider>
+          </ParametersContext.Provider>
+        </EditorContext.Provider>
+      </HistoryContext.Provider>
+    </GlobalContext.Provider>
   )
 }
 
@@ -599,8 +619,10 @@ function ProviderWithRoutes() {
         path="/settings"
         element={
           <APIContextWrapper>
-            <Settings />
-            <Toaster />
+            <PlaygroundContextWrapper key = "compare" page = "compare">
+              <Settings />
+              <Toaster />
+            </PlaygroundContextWrapper>
           </APIContextWrapper>
         }
       />
