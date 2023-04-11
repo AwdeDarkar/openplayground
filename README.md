@@ -8,7 +8,7 @@ https://user-images.githubusercontent.com/111631/227399583-39b23f48-9823-4571-a9
 
 - Use any model from [OpenAI](), [Anthropic](), [Cohere](), [Forefront](), [HuggingFace](), [Aleph Alpha](), and [llama.cpp]().
 - Full playground UI, including history, parameter tuning, keyboard shortcuts, and logprops.
-- Compare models side-by-side with the same prompt, individually tune model parameters, and retry with different paramaters.
+- Compare models side-by-side with the same prompt, individually tune model parameters, and retry with different parameters.
 - Automatically detects local models in your HuggingFace cache, and lets you install new ones.
 - Works OK on your phone.
 - Probably won't kill everyone.
@@ -24,7 +24,12 @@ $ pip install openplayground
 $ openplayground run
 ```
 
-This runs a Flask process, so you can add the typical flags such as setting a different port `openplayground run -p 1235` and others. 
+Alternatively, run it as a docker container:
+```sh
+$ docker run --name openplayground -p 5432:5432 -d --volume openplayground:/web/config natorg/openplayground
+```
+
+This runs a Flask process, so you can add the typical flags such as setting a different port `openplayground run -p 1235` and others.
 
 ## How to run for development
 
@@ -33,6 +38,15 @@ $ git clone https://github.com/nat/openplayground
 $ cd app && npm install && npx parcel watch src/index.html --no-cache
 $ cd server && pip3 install -r requirements.txt && cd .. && python3 -m server.app
 ```
+
+## Docker
+
+```sh
+$ docker build . --tag "openplayground"
+$ docker run --name openplayground -p 5432:5432 -d --volume openplayground:/web/config openplayground
+```
+
+First volume is optional. It's used to store API keys, models settings.
 
 ## Ideas for contributions
 
@@ -49,19 +63,20 @@ $ cd server && pip3 install -r requirements.txt && cd .. && python3 -m server.ap
 
 ### llama.cpp
 
-
-## Adding models to openplayground 
+## Adding models to openplayground
 
 Models and providers have three types in openplayground:
-+ Searchable
-+ Local inference
-+ API
+
+- Searchable
+- Local inference
+- API
 
 You can add models in `server/models.json` with the following schema:
 
 #### Local inference
 
 For models running locally on your device you can add them to openplayground like the following (a minimal example):
+
 ```json
 "llama": {
     "api_key" : false,
@@ -86,6 +101,7 @@ Keep in mind you will need to add a generation method for your model in `server/
 #### API Provider Inference
 
 This is for model providers like OpenAI, cohere, forefront, and more. You can connect them easily into openplayground (a minimal example):
+
 ```json
 "cohere": {
     "api_key" : true,
